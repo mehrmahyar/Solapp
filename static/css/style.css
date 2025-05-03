@@ -1,0 +1,152 @@
+/* Basic Modernization Styles */
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    background-color: #f8f9fa; /* Light gray background */
+}
+
+/* Subtle transitions */
+a,
+.btn {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Slightly rounded corners */
+.btn,
+.alert,
+.card,
+.form-control,
+.list-group-item {
+    border-radius: 0.3rem; /* Adjust as needed */
+}
+
+.table {
+    /* Improve table spacing/appearance */
+    margin-bottom: 1.5rem;
+}
+
+.table thead th {
+    border-bottom-width: 2px; /* Slightly heavier header border */
+}
+
+/* Add some breathing room to page titles */
+.page-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #dee2e6; /* Subtle separator */
+}
+
+/* Custom Styles for SOLAPP */
+
+:root {
+  --bs-body-bg: #f8f9fa; /* Light grey background */
+}
+
+body {
+    padding-bottom: 60px; /* Footer height */
+    background-color: var(--bs-body-bg);
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.card {
+    border: none; /* Softer look */
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Subtle shadow */
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+     transform: translateY(-2px); /* Slight lift on hover */
+}
+
+.table {
+    background-color: #fff; /* Ensure tables on grey background are white */
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.04); /* Lighter hover */
+}
+
+.chart-container {
+    position: relative;
+    width: 100%;
+    border: none; /* Remove border, rely on card/bg */
+    padding: 15px;
+    margin-bottom: 20px;
+    background-color: #fff;
+    border-radius: 0.375rem; /* Match Bootstrap card radius */
+     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Smaller cards for photos */
+.photo-card img {
+    aspect-ratio: 1 / 1; /* Make images square */
+    object-fit: cover; /* Cover the square area */
+     border-top-left-radius: var(--bs-card-inner-border-radius);
+    border-top-right-radius: var(--bs-card-inner-border-radius);
+}
+
+.photo-card .card-body-sm {
+    padding: 0.5rem;
+}
+
+/* Smaller text in tables */
+.table-sm td, .table-sm th {
+    font-size: 0.875rem;
+    padding: 0.4rem;
+}
+
+.btn-xs {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    border-radius: 0.2rem;
+}
+
+.workout-table th,
+.workout-table td {
+     vertical-align: middle;
+}
+
+/* Adjust Plotly default margins maybe? */
+/* .plotly-graph-div { margin: auto !important; } */
+
+/* Ensure tab content takes up space */
+.tab-content {
+    padding-top: 1.5rem;
+    background-color: #fff;
+    padding: 1.5rem;
+    border-radius: 0 0 var(--bs-border-radius) var(--bs-border-radius);
+    border: 1px solid var(--bs-border-color);
+    border-top: none;
+     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Style for workout program builder rows */
+.exercise-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end; /* Align button nicely */
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background-color: #f8f9fa;
+}
+
+.exercise-row > div {
+    flex-grow: 1;
+}
+
+.exercise-row .form-control,
+.exercise-row .form-select {
+    font-size: 0.875rem; /* Smaller font in rows */
+}
+
+/* Make remove button smaller */
+.remove-exercise-btn {
+    flex-shrink: 0; /* Prevent button from shrinking */
+    height: calc(1.5em + 0.75rem + 2px); /* Match form control height */
+}

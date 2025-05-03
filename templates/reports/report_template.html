@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ report_title }}</title>
+    <style>
+        /* WeasyPrint CSS goes here or link external */
+        body { font-family: sans-serif; font-size: 11pt; }
+        h1, h2, h3, h4 { color: #333; margin-bottom: 0.5em; padding-bottom: 0.2em; border-bottom: 1px solid #eee;}
+        h1 { font-size: 24pt; text-align: center; border-bottom: 2px solid #333; margin-bottom: 1em;}
+        h2 { font-size: 18pt; margin-top: 1.5em; }
+        h3 { font-size: 14pt; margin-top: 1em; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 1em; page-break-inside: avoid; }
+        th, td { border: 1px solid #ccc; padding: 5px; text-align: left; vertical-align: top;}
+        th { background-color: #eee; font-weight: bold; }
+        .plot-container { text-align: center; margin: 1em 0; page-break-inside: avoid; }
+        .plot-container img { max-width: 95%; height: auto; border: 1px solid #eee; }
+        .no-data { font-style: italic; color: #888; text-align: center; padding: 1em; }
+        .summary-dl dt { font-weight: bold; width: 150px; float: left; clear: left; }
+        .summary-dl dd { margin-left: 160px; margin-bottom: 0.3em; }
+        .page-break { page-break-before: always; }
+        /* Add more styles as needed for specific sections */
+    </style>
+</head>
+<body>
+    <h1>{{ report_title }}</h1>
+    <p style="text-align: center; margin-bottom: 2em;"><strong>Report Period:</strong> {{ start_date.strftime('%Y-%m-%d') }} to {{ end_date.strftime('%Y-%m-%d') }}</p>
+
+    {% if report_type == 'client' and client %}
+    <h2>Player Summary</h2>
+    <dl class="summary-dl">
+        <dt>Name:</dt><dd>{{ client.name }}</dd>
+        <dt>Team:</dt><dd>{{ client.team.name }}</dd>
+        <dt>Position:</dt><dd>{{ client.position or 'N/A' }}</dd>
+         <dt>Date of Birth:</dt><dd>{{ client.dob.strftime('%Y-%m-%d') if client.dob else 'N/A' }}</dd>
+    </dl>
+    {% elif report_type == 'team' and team %}
+     <h2>Team Summary</h2>
+     <p>Team: <strong>{{ team.name }}</strong></p>
+     <p>Number of Players: {{ team.players|length }}</p>
+     <!-- Add more team summary stats if calculated in get_report_data -->
+    {% endif %}
+
+    <!-- === Readiness Section === -->
+    <h2 class="page-break">Readiness Overview</h2>
+    {% if report_type == 'client' %}
+        {% if plot_files.readiness_plot %}
+            <div class="plot-container">
+                <img src="file://{{ plot_files.readiness_plot }}" alt="Readiness Trend Plot">
+            </div>
+        {% else %}
+            <p class="no-data">No readiness plot available for this period.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if readiness_data %}
+        <h3>Readiness Data</h3>
+        <table>
+             <thead>
+                <tr><th>Date</th>{% if report_type == 'team' %}<th>Player</th>{% endif %}<th>Score</th><th>Sleep (Q/Dur)</th><th>Soreness</th><th>Fatigue</th><th>Mood</th><th>Stress</th><th>Confid.</th><th>Pain</th></tr>
+            </thead>
+             <tbody>
+                {% for entry in readiness_data %}
+                    <tr>
+                        <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                        {% if report_type == 'team' %}<td>{{ entry.client.name }}</td>{% endif %}
+                        <td>{{ "{:.1f}".format(entry.calculated_readiness_score) if entry.calculated_readiness_score is not none else 'N/A' }}</td>
+                        <td>{{ entry.sleep_quality or '-' }} / {{ "{:.1f}h".format(entry.sleep_duration) if entry.sleep_duration is not none else '-' }}</td>
+                        <td>{{ entry.muscle_soreness or '-' }}</td>
+                        <td>{{ entry.fatigue_level or '-' }}</td>
+                        <td>{{ entry.mood or '-' }}</td>
+                        <td>{{ entry.stress_level or '-' }}</td>
+                        <td>{{ entry.confidence or '-' }}</td>
+                        <td>{{ 'Yes' if entry.injury_pain else 'No' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+         <p class="no-data">No readiness data recorded in this period.</p>
+    {% endif %}
+
+    <!-- === Body Composition Section === -->
+    <h2 class="page-break">Body Composition</h2>
+    {% if report_type == 'client' %}
+        {% if plot_files.body_comp_plot %}
+            <div class="plot-container">
+                <img src="file://{{ plot_files.body_comp_plot }}" alt="Body Composition Plot">
+            </div>
+        {% else %}
+             <p class="no-data">No body composition plot available for this period.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if body_comp_data %}
+        <h3>Body Composition Data</h3>
+        <table>
+             <thead>
+                <tr><th>Date</th>{% if report_type == 'team' %}<th>Player</th>{% endif %}<th>Weight (kg)</th><th>Height (cm)</th><th>Body Fat (%)</th><th>Muscle Mass (kg)</th></tr>
+            </thead>
+             <tbody>
+                {% for entry in body_comp_data %}
+                    <tr>
+                         <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                         {% if report_type == 'team' %}<td>{{ entry.client.name }}</td>{% endif %}
+                         <td>{{ "{:.1f}".format(entry.weight) if entry.weight is not none else '-' }}</td>
+                         <td>{{ "{:.1f}".format(entry.height) if entry.height is not none else '-' }}</td>
+                         <td>{{ "{:.1f}".format(entry.body_fat) if entry.body_fat is not none else '-' }}</td>
+                         <td>{{ "{:.1f}".format(entry.muscle_mass) if entry.muscle_mass is not none else '-' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-data">No body composition data recorded in this period.</p>
+    {% endif %}
+
+    <!-- === Physical Tests Section === -->
+    <h2 class="page-break">Physical Tests</h2>
+     {% if report_type == 'client' %}
+        {% if plot_files.test_plots %}
+            {% for test_name, plot_path in plot_files.test_plots.items() %}
+                 {% if plot_path %}
+                    <div class="plot-container">
+                        <img src="file://{{ plot_path }}" alt="{{ test_name }} Plot">
+                    </div>
+                 {% endif %}
+            {% endfor %}
+        {% else %}
+             <p class="no-data">No key physical test plots available for this period.</p>
+        {% endif %}
+    {% endif %}
+
+    {% if physical_test_data %}
+        <h3>Physical Test Data</h3>
+         <table>
+            <thead>
+                <tr><th>Date</th>{% if report_type == 'team' %}<th>Player</th>{% endif %}<th>Test</th><th>Result</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                {% for entry in physical_test_data %}
+                    <tr>
+                        <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                         {% if report_type == 'team' %}<td>{{ entry.client.name }}</td>{% endif %}
+                        <td>{{ entry.test_type.value }}</td>
+                        <td>{{ entry.value }}</td>
+                        <td>{{ entry.notes or '' }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+         <p class="no-data">No physical test results recorded in this period.</p>
+    {% endif %}
+
+    <!-- === Training Logs Section === -->
+    <h2 class="page-break">Training Logs</h2>
+    {% if training_session_data %}
+        <h3>Training Session Summaries</h3>
+         <table>
+            <thead>
+                <tr><th>Date</th>{% if report_type == 'team' %}<th>Player</th>{% endif %}<th>Program</th><th>Duration</th><th>Session RPE</th><th>Rating</th></tr>
+            </thead>
+            <tbody>
+                {% for entry in training_session_data %}
+                    <tr>
+                        <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                        {% if report_type == 'team' %}<td>{{ entry.client.name }}</td>{% endif %}
+                        <td>
+                            {% if entry.workout_program_id %}
+                                {{ entry.workout_program.name if entry.workout_program else 'Deleted Program' }}
+                            {% else %}
+                                Custom Session
+                            {% endif %}
+                        </td>
+                        <td>{{ "{} min".format(entry.duration_minutes) if entry.duration_minutes else '-' }}</td>
+                        <td>{{ entry.session_rpe or '-' }}</td>
+                        <td>{{ entry.session_rating or '-' }}</td>
+                    </tr>
+                     {# Add detailed logs if needed - requires parsing JSON #}
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-data">No training sessions logged in this period.</p>
+    {% endif %}
+
+</body>
+</html> 

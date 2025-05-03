@@ -1,0 +1,12 @@
+Flask
+Flask-SQLAlchemy
+Flask-WTF
+Flask-Migrate
+SQLAlchemy
+python-dotenv
+plotly
+pandas
+numpy
+WeasyPrint
+Pillow
+kaleido 

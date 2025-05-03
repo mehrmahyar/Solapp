@@ -1,0 +1,43 @@
+{% extends 'layout.html' %}
+{% import '_formhelpers.html' as forms %}
+
+{% block title %}{{ title }} - {{ client.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ title }} <small class="text-muted">({{ client.name }})</small></h1>
+    <a href="{{ url_for('view_client', client_id=client.id) }}" class="btn btn-secondary btn-sm">Back to Player Profile</a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" action="" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    {% for field in form if field.type != 'CSRFTokenField' and field.type != 'SubmitField' %}
+                        {{ forms.render_field(field) }}
+                    {% endfor %}
+
+                    {% if instructions %}
+                        <div class="alert alert-info small">{{ instructions }}</div>
+                    {% endif %}
+                    {% if json_instructions %}
+                        <div class="alert alert-secondary small">
+                            <p><strong>JSON Structure Example:</strong></p>
+                            <pre>{{ json_instructions }}</pre>
+                        </div>
+                    {% endif %}
+
+                    <div class="mt-3">
+                        {{ form.submit(class='btn btn-primary') }}
+                        {% if client %}
+                        <a href="{{ url_for('view_client', client_id=client.id) }}" class="btn btn-secondary">Cancel</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

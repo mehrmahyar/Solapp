@@ -1,0 +1,17 @@
+# Virtual environment
+venv/
+*.pyc
+__pycache__/
+
+# Instance folder (contains database, plot images)
+instance/
+
+# Uploads folder
+uploads/
+
+# Environment variables
+.env
+
+# OS generated files
+.DS_Store
+Thumbs.db 

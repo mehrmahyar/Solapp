@@ -1,0 +1,358 @@
+{% extends 'layout.html' %}
+
+{% block title %}Player Profile: {{ client.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-person-badge"></i> Player Profile: {{ client.name }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{{ url_for('edit_client', client_id=client.id) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil"></i> Edit Profile</a>
+            <!-- Add dropdown for adding data -->
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-plus-lg"></i> Add Data
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{{ url_for('add_readiness', client_id=client.id) }}">Add Readiness Entry</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('add_body_composition', client_id=client.id) }}">Add Body Composition</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('add_physical_test', client_id=client.id) }}">Add Physical Test</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('add_training_session', client_id=client.id) }}">Log Training Session</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ url_for('add_baseline', client_id=client.id) }}">Set/Update Baselines</a></li>
+                     <li><a class="dropdown-item" href="{{ url_for('add_progress_photo', client_id=client.id) }}">Upload Progress Photo</a></li>
+                     <li><a class="dropdown-item" href="{{ url_for('add_health_questionnaire', client_id=client.id) }}">Add/Edit Health Questionnaire</a></li>
+                </ul>
+            </div>
+        </div>
+        <a href="{{ url_for('list_clients') }}" class="btn btn-sm btn-outline-secondary">Back to Players</a>
+    </div>
+</div>
+
+<!-- Player Info Row -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">Player Details</div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item"><strong>ID:</strong> {{ client.id }}</li>
+                <li class="list-group-item"><strong>Name:</strong> {{ client.name }}</li>
+                <li class="list-group-item"><strong>Team:</strong> {{ client.team.name if client.team else '<span class="text-muted">_Individual_</span>'|safe }}</li>
+                <li class="list-group-item"><strong>Position:</strong> {{ client.position or 'N/A' }}</li>
+                <li class="list-group-item"><strong>DOB:</strong> {{ client.dob.strftime('%Y-%m-%d') if client.dob else 'N/A' }}</li>
+                <li class="list-group-item"><strong>Status:</strong> {{ 'Approved' if client.approval_status else 'Pending' }}</li>
+            </ul>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header">Today's Workout</div>
+            <div class="card-body">
+                {% if today_program %}
+                    <h5 class="card-title">{{ today_program.name }} ({{ today_program.date.strftime('%Y-%m-%d') }})</h5>
+                     {% if program_exercises %}
+                        {% for category, exercises in program_exercises.items() %}
+                            {% if exercises %}
+                                <h6>{{ category }}</h6>
+                                <table class="table table-sm table-hover mb-3 workout-table">
+                                    <thead>
+                                        <tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>Rest</th><th>Notes</th></tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for ex in exercises %}
+                                        <tr>
+                                            <td>
+                                                {% if ex.video_url %}
+                                                <a href="{{ ex.video_url }}" target="_blank" title="Watch Video">{{ ex.name }} <i class="bi bi-play-circle"></i></a>
+                                                {% else %}
+                                                {{ ex.name }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ ex.sets }}</td>
+                                            <td>{{ ex.reps }}</td>
+                                            <td>{{ ex.rest }}</td>
+                                            <td>{{ ex.notes }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">Could not parse exercises for this program.</p>
+                    {% endif %}
+                    <a href="{{ url_for('add_training_session', client_id=client.id, program_id=today_program.id) }}" class="btn btn-sm btn-outline-primary">Log This Session</a>
+                {% else %}
+                    <p class="text-muted">No workout program assigned for today.</p>
+                     <a href="{{ url_for('list_workout_programs') }}" class="btn btn-sm btn-outline-secondary">Assign Program?</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Tabs -->
+<ul class="nav nav-tabs mb-3" id="clientDataTab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="readiness-tab" data-bs-toggle="tab" data-bs-target="#readiness" type="button" role="tab" aria-controls="readiness" aria-selected="true">Readiness</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="bodycomp-tab" data-bs-toggle="tab" data-bs-target="#bodycomp" type="button" role="tab" aria-controls="bodycomp" aria-selected="false">Body Comp</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tests-tab" data-bs-toggle="tab" data-bs-target="#tests" type="button" role="tab" aria-controls="tests" aria-selected="false">Physical Tests</button>
+  </li>
+   <li class="nav-item" role="presentation">
+    <button class="nav-link" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions" type="button" role="tab" aria-controls="sessions" aria-selected="false">Training Logs</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="photos-tab" data-bs-toggle="tab" data-bs-target="#photos" type="button" role="tab" aria-controls="photos" aria-selected="false">Progress Photos</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="health-tab" data-bs-toggle="tab" data-bs-target="#health" type="button" role="tab" aria-controls="health" aria-selected="false">Health Info</button>
+  </li>
+</ul>
+
+<div class="tab-content" id="clientDataTabContent">
+  <!-- Readiness Tab -->
+  <div class="tab-pane fade show active" id="readiness" role="tabpanel" aria-labelledby="readiness-tab">
+    <h4>Readiness Overview (Last 30 days)</h4>
+    <div class="mb-3">
+        <a href="{{ url_for('add_readiness', client_id=client.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-calendar-plus"></i> Log Today's Readiness</a>
+        <!-- Add date range selector later -->
+    </div>
+    {% if readiness_plot_html %}
+        <div class="chart-container mb-4">
+            {{ readiness_plot_html|safe }}
+        </div>
+    {% else %}
+        <div class="alert alert-light">No readiness data found for the last 30 days.</div>
+    {% endif %}
+
+    <h5>Recent Readiness Entries</h5>
+    {% if client.readiness_entries %}
+        <table class="table table-sm table-striped table-hover">
+            <thead>
+                <tr><th>Date</th><th>Score</th><th>Sleep (Q/Dur)</th><th>Soreness</th><th>Fatigue</th><th>Mood</th><th>Stress</th><th>Confid.</th><th>Pain</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for entry in client.readiness_entries[:10] %} {# Show last 10 entries #}
+                    <tr>
+                        <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                        <td><span class="badge bg-{{ 'success' if entry.calculated_readiness_score >= 75 else 'warning' if entry.calculated_readiness_score >= 50 else 'danger' }}">{{ "{:.1f}".format(entry.calculated_readiness_score) if entry.calculated_readiness_score is not none else 'N/A' }}</span></td>
+                        <td>{{ entry.sleep_quality or '-' }} / {{ "{:.1f}h".format(entry.sleep_duration) if entry.sleep_duration is not none else '-' }}</td>
+                        <td>{{ entry.muscle_soreness or '-' }}</td>
+                        <td>{{ entry.fatigue_level or '-' }}</td>
+                        <td>{{ entry.mood or '-' }}</td>
+                        <td>{{ entry.stress_level or '-' }}</td>
+                        <td>{{ entry.confidence or '-' }}</td>
+                        <td>{{ 'Yes' if entry.injury_pain else 'No' }}</td>
+                        <td>
+                            <a href="{{ url_for('add_readiness', client_id=client.id, date=entry.date.strftime('%Y-%m-%d')) }}" class="btn btn-xs btn-outline-secondary" title="Edit">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+         <p class="text-muted">No readiness entries recorded yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Body Composition Tab -->
+  <div class="tab-pane fade" id="bodycomp" role="tabpanel" aria-labelledby="bodycomp-tab">
+    <h4>Body Composition Trend (Last 30 days)</h4>
+     <div class="mb-3">
+        <a href="{{ url_for('add_body_composition', client_id=client.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-circle"></i> Add Body Comp Entry</a>
+        <!-- Add date range selector later -->
+    </div>
+    {% if body_comp_plot_html %}
+        <div class="chart-container mb-4">
+            {{ body_comp_plot_html|safe }}
+        </div>
+    {% else %}
+        <div class="alert alert-light">No body composition data found for the last 30 days.</div>
+    {% endif %}
+
+    <h5>Recent Body Composition Entries</h5>
+    {% if client.body_compositions %}
+        <table class="table table-sm table-striped table-hover">
+            <thead>
+                <tr><th>Date</th><th>Weight (kg)</th><th>Height (cm)</th><th>Body Fat (%)</th><th>Muscle Mass (kg)</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for entry in client.body_compositions[:10] %}
+                    <tr>
+                        <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ "{:.1f}".format(entry.weight) if entry.weight is not none else '-' }}</td>
+                        <td>{{ "{:.1f}".format(entry.height) if entry.height is not none else '-' }}</td>
+                        <td>{{ "{:.1f}".format(entry.body_fat) if entry.body_fat is not none else '-' }}</td>
+                        <td>{{ "{:.1f}".format(entry.muscle_mass) if entry.muscle_mass is not none else '-' }}</td>
+                        <td> <!-- Edit/Delete buttons? --> </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="text-muted">No body composition entries recorded yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Physical Tests Tab -->
+  <div class="tab-pane fade" id="tests" role="tabpanel" aria-labelledby="tests-tab">
+    <h4>Physical Test Results</h4>
+    <div class="mb-3">
+        <a href="{{ url_for('add_physical_test', client_id=client.id) }}" class="btn btn-sm btn-outline-primary me-2"><i class="bi bi-plus-circle"></i> Add Test Result</a>
+        <a href="{{ url_for('add_baseline', client_id=client.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-rulers"></i> Set/Update Baselines</a>
+    </div>
+
+    <h5>Baselines</h5>
+    {% if client.baselines %}
+        <table class="table table-sm table-bordered mb-4" style="max-width: 600px;">
+            <thead><tr><th>Test</th><th>Baseline Value</th><th>Date Set</th></tr></thead>
+            <tbody>
+                {% for baseline in client.baselines %}
+                <tr><td>{{ baseline.test_type.value }}</td><td>{{ baseline.value }}</td><td>{{ baseline.date_set.strftime('%Y-%m-%d') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="text-muted">No baselines set yet.</p>
+    {% endif %}
+
+    <h5>Test Result Trends (Last 30 days)</h5>
+    {% if test_plots_html %}
+        <div class="row">
+        {% for test_name, plot_html in test_plots_html.items() %}
+            <div class="col-md-6">
+                <div class="chart-container mb-4">
+                    {{ plot_html|safe }}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+         <div class="alert alert-light">No trend data available for key tests in the last 30 days.</div>
+    {% endif %}
+
+    <h5>All Test History</h5>
+    {% if client.physical_tests %}
+        <table class="table table-sm table-striped table-hover">
+            <thead>
+                <tr><th>Date</th><th>Test</th><th>Result</th><th>Notes</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for entry in client.physical_tests[:20] %} {# Show last 20 #}
+                    <tr>
+                        <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ entry.test_type.value }}</td>
+                        <td>{{ entry.value }}</td>
+                        <td>{{ entry.notes or '' }}</td>
+                        <td> <!-- Edit/Delete buttons? --> </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+         {% if client.physical_tests|length > 20 %}<p class="text-muted"><small>Showing last 20 results...</small></p>{% endif %}
+    {% else %}
+        <p class="text-muted">No physical test results recorded yet.</p>
+    {% endif %}
+  </div>
+
+   <!-- Training Logs Tab -->
+  <div class="tab-pane fade" id="sessions" role="tabpanel" aria-labelledby="sessions-tab">
+    <h4>Training Session Logs</h4>
+     <div class="mb-3">
+        <a href="{{ url_for('add_training_session', client_id=client.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-circle"></i> Log New Session</a>
+    </div>
+    {% if client.training_sessions %}
+        <table class="table table-sm table-striped table-hover">
+            <thead>
+                <tr><th>Date</th><th>Program</th><th>Duration</th><th>Session RPE</th><th>Rating</th><th>Log Details</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for entry in client.training_sessions[:10] %}
+                    <tr>
+                        <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            {% if entry.workout_program_id %}
+                                {{ entry.workout_program.name if entry.workout_program else 'Deleted Program' }} <!-- Handle if program deleted -->
+                            {% else %}
+                                Custom Session
+                            {% endif %}
+                        </td>
+                        <td>{{ "{} min".format(entry.duration_minutes) if entry.duration_minutes else '-' }}</td>
+                        <td>{{ entry.session_rpe or '-' }}</td>
+                        <td>{{ entry.session_rating or '-' }}</td>
+                        <td><a href="#" class="btn btn-xs btn-outline-info disabled" title="View Details (TODO)"><i class="bi bi-list-check"></i></a></td>
+                        <td> <!-- Edit/Delete buttons? --> </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="text-muted">No training sessions logged yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Progress Photos Tab -->
+  <div class="tab-pane fade" id="photos" role="tabpanel" aria-labelledby="photos-tab">
+    <h4>Progress Photos</h4>
+    <div class="mb-3">
+        <a href="{{ url_for('add_progress_photo', client_id=client.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-camera"></i> Upload New Photo</a>
+    </div>
+    {% if client.progress_photos %}
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-3">
+            {% for photo in client.progress_photos %}
+            <div class="col">
+                <div class="card photo-card h-100 shadow-sm">
+                    <img src="{{ url_for('uploaded_file', filename=photo.photo_path) }}" class="card-img-top" alt="Progress photo {{ photo.angle or '' }} {{ photo.upload_date.strftime('%Y-%m-%d') }}">
+                    <div class="card-body card-body-sm">
+                        <p class="card-text mb-0"><small class="text-muted">{{ photo.upload_date.strftime('%Y-%m-%d') }}</small></p>
+                        {% if photo.angle %}<p class="card-text mb-0"><small>{{ photo.angle }} View</small></p>{% endif %}
+                        {# Add delete button? #}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted">No progress photos uploaded yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Health Info Tab -->
+  <div class="tab-pane fade" id="health" role="tabpanel" aria-labelledby="health-tab">
+    <h4>Health Questionnaire &amp; Info</h4>
+     <div class="mb-3">
+        <a href="{{ url_for('add_health_questionnaire', client_id=client.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Edit Questionnaire</a>
+    </div>
+    <div class="card mb-3">
+        <div class="card-header">Registration Details</div>
+        <div class="card-body">
+            <pre style="white-space: pre-wrap;">{{ client.registration_details or 'No details provided.' }}</pre>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Health Questionnaire Responses</div>
+        <div class="card-body">
+            {% if client.health_questionnaires and client.health_questionnaires.responses %}
+                <dl class="row">
+                {% for question, answer in client.health_questionnaires.responses.items() %}
+                    <dt class="col-sm-4">{{ question }}</dt>
+                    <dd class="col-sm-8">{{ answer }}</dd>
+                {% endfor %}
+                </dl>
+                 <small class="text-muted">Submitted on: {{ client.health_questionnaires.submission_date.strftime('%Y-%m-%d') if client.health_questionnaires.submission_date else 'N/A' }}</small>
+            {% else %}
+                <p class="text-muted">No health questionnaire submitted.</p>
+            {% endif %}
+        </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %} 

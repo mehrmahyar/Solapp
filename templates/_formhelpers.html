@@ -1,0 +1,29 @@
+{% macro render_field(field, sr_only=False, widget_args={}) %}
+  <div class="mb-3 {% if field.errors %} has-error{% endif %}">
+    {% if field.type != 'HiddenField' and field.type != 'CSRFTokenField' and field.type != 'SubmitField' %}
+        {{ field.label(class='form-label' + (' visually-hidden' if sr_only else '')) }}
+    {% endif %}
+
+    {% if field.type == 'BooleanField' %}
+        <div class="form-check">
+             {{ field(class='form-check-input', **widget_args) }}
+             {{ field.label(class='form-check-label') }}
+        </div>
+    {% elif field.type == 'FileField' %}
+         {{ field(class='form-control', **widget_args) }}
+    {% else %}
+        {{ field(class='form-control' + (' is-invalid' if field.errors else ''), **widget_args) }}
+    {% endif %}
+
+    {% if field.errors %}
+      <div class="invalid-feedback">
+        {% for error in field.errors %}
+          {{ error }}
+        {% endfor %}
+      </div>
+    {% endif %}
+     {% if field.description %}
+        <div class="form-text">{{ field.description }}</div>
+    {% endif %}
+  </div>
+{% endmacro %} 

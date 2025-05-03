@@ -1,0 +1,13 @@
+{% extends 'layout.html' %}
+
+{% block title %}Internal Server Error{% endblock %}
+
+{% block content %}
+<div class="container text-center mt-5">
+  <h1 class="display-1">500</h1>
+  <p class="lead">Oops! Something went wrong on our end.</p>
+  <p>We're sorry for the inconvenience. Please try again later or contact support if the problem persists.</p>
+  <p><small>(Check the application logs for more details)</small></p>
+  <a href="{{ url_for('index') }}" class="btn btn-primary mt-3">Go to Dashboard</a>
+</div>
+{% endblock %} 

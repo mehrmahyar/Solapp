@@ -1,0 +1,78 @@
+{% extends 'layout.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+  {# Use page-header class for consistent title styling #}
+  <div class="page-header d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3">
+      <h1 class="h2">Dashboard</h1>
+      <!-- Add quick action buttons? -->
+      <div class="btn-toolbar mb-2 mb-md-0">
+          <a href="{{ url_for('add_client') }}" class="btn btn-sm btn-outline-secondary me-2">
+              <i class="bi bi-plus-circle"></i> Add Player
+          </a>
+          <a href="{{ url_for('generate_report') }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-file-earmark-pdf"></i> Generate Report
+          </a>
+      </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+      <div class="col-md-3">
+          <div class="card text-center">
+              <div class="card-body">
+                  <h5 class="card-title"><i class="bi bi-people-fill text-primary"></i> Teams</h5>
+                  <p class="card-text display-4">{{ teams_count }}</p>
+                  <a href="{{ url_for('list_teams') }}" class="btn btn-primary btn-sm">Manage Teams</a>
+              </div>
+          </div>
+      </div>
+      <div class="col-md-3">
+          <div class="card text-center">
+              <div class="card-body">
+                  <h5 class="card-title"><i class="bi bi-person-fill text-success"></i> Players</h5>
+                  <p class="card-text display-4">{{ clients_count }}</p>
+                  <a href="{{ url_for('list_clients') }}" class="btn btn-success btn-sm">Manage Players</a>
+              </div>
+          </div>
+      </div>
+      <div class="col-md-3">
+          <div class="card text-center">
+              <div class="card-body">
+                  <h5 class="card-title"><i class="bi bi-clipboard-check-fill text-warning"></i> Today's Readiness</h5>
+                  <p class="card-text display-6">{{ "{:.1f}".format(today_readiness_avg) if today_readiness_avg is not none else 'N/A' }} <small class="text-muted">avg</small></p>
+                  <p class="card-text"><small>{{ today_readiness_count }} players logged</small></p>
+                  <!-- Link to view readiness entries? -->
+              </div>
+          </div>
+      </div>
+      <div class="col-md-3">
+          <div class="card text-center">
+              <div class="card-body">
+                  <h5 class="card-title"><i class="bi bi-calendar-event text-info"></i> Upcoming...</h5>
+                  <p class="card-text">[ Feature Placeholder ]</p>
+                  <small class="text-muted">e.g., Today's Workouts</small>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <h2 class="h4">Recent Activity / Quick Links</h2>
+  <div class="row">
+      <div class="col-md-6">
+          <div class="list-group">
+              <a href="{{ url_for('list_clients') }}" class="list-group-item list-group-item-action">View All Players</a>
+              <a href="{{ url_for('list_workout_programs') }}" class="list-group-item list-group-item-action">Manage Workout Programs</a>
+              <a href="{{ url_for('list_exercises') }}" class="list-group-item list-group-item-action">Manage Exercise Library</a>
+          </div>
+      </div>
+      <div class="col-md-6">
+           <div class="list-group">
+               <a href="#" class="list-group-item list-group-item-action disabled">View Recent Training Logs (TODO)</a>
+               <a href="#" class="list-group-item list-group-item-action disabled">Team Readiness Overview (TODO)</a>
+               <a href="{{ url_for('generate_report') }}" class="list-group-item list-group-item-action">Generate New Report</a>
+          </div>
+      </div>
+  </div>
+
+{% endblock %} 

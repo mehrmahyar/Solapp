@@ -1,0 +1,77 @@
+{% extends 'layout.html' %}
+{% import '_formhelpers.html' as forms %}
+
+{% block title %}Generate Report{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Generate Report</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <form method="POST" action="" novalidate>
+            {{ form.hidden_tag() }}
+            <div class="row mb-3">
+                 <div class="col-md-4">
+                    {{ forms.render_field(form.report_type) }}
+                 </div>
+                 <div class="col-md-8" id="team-select-div" style="display: none;">
+                     {{ forms.render_field(form.team_id) }}
+                 </div>
+                 <div class="col-md-8" id="client-select-div">
+                     {{ forms.render_field(form.client_id) }}
+                 </div>
+            </div>
+             <div class="row mb-3">
+                <div class="col-md-6">
+                    {{ forms.render_field(form.start_date) }}
+                </div>
+                 <div class="col-md-6">
+                    {{ forms.render_field(form.end_date) }}
+                 </div>
+            </div>
+
+            <div class="mt-3">
+                {{ form.submit(class='btn btn-primary') }}
+            </div>
+        </form>
+    </div>
+     <div class="col-md-4">
+        <div class="alert alert-info">
+            <h4 class="alert-heading">Report Details</h4>
+            <p>Select whether you want to generate a report for an individual player or an entire team.</p>
+            <p>Choose the desired date range for the report.</p>
+            <hr>
+            <p class="mb-0">The report will be generated as a PDF file including relevant data and visualizations for the selected period.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Show/hide Player/Team select based on Report Type
+    const reportTypeSelect = document.getElementById('report_type');
+    const teamSelectDiv = document.getElementById('team-select-div');
+    const clientSelectDiv = document.getElementById('client-select-div');
+
+    function toggleEntitySelect() {
+        if (reportTypeSelect.value === 'team') {
+            teamSelectDiv.style.display = 'block';
+            clientSelectDiv.style.display = 'none';
+            // Reset client select if switching
+            document.getElementById('client_id').value = '';
+        } else { // Default to client
+            teamSelectDiv.style.display = 'none';
+            clientSelectDiv.style.display = 'block';
+             // Reset team select if switching
+            document.getElementById('team_id').value = '';
+        }
+    }
+
+    reportTypeSelect.addEventListener('change', toggleEntitySelect);
+    // Initial call on page load
+    toggleEntitySelect();
+</script>
+{% endblock %} 

@@ -1,0 +1,101 @@
+{% extends 'layout.html' %}
+{% import '_formhelpers.html' as forms %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ title }}</h1>
+    <a href="{{ url_for('list_workout_programs') }}" class="btn btn-secondary btn-sm">Back to Programs</a>
+</div>
+
+{# Use novalidate because custom JS will handle exercise list validation/structuring #}
+{# Add data attribute to store existing JSON #}
+<form method="POST" action="" id="program-form" novalidate
+      data-existing-program='{{ program.exercises_json | tojson if program and program.exercises_json else "null" }}'>
+    {{ form.hidden_tag() }}
+    {# Hidden field to store final JSON #}
+    {{ form.exercises_json_data(id='exercises-json-data') }}
+
+    <div class="row">
+        <div class="col-md-10">
+
+            <div class="row">
+                <div class="col-md-8">
+                    {{ forms.render_field(form.name) }}
+                </div>
+                 <div class="col-md-4">
+                    {{ forms.render_field(form.date) }}
+                 </div>
+            </div>
+             <div class="row">
+                 <div class="col-md-6">
+                    {{ forms.render_field(form.assign_to_team) }}
+                 </div>
+                <div class="col-md-6">
+                    {{ forms.render_field(form.assign_to_client) }}
+                     <small class="form-text text-muted">Leave both blank to create a reusable template.</small>
+                </div>
+            </div>
+            {{ forms.render_field(form.notes, widget_args={'rows': 3}) }}
+        </div> {# End Notes Col #}
+    </div> {# End Row for Name/Date/Assign/Notes #}
+
+    <hr>
+    <h5>Build Workout</h5>
+    <div id="exercise-list-container" class="mb-3">
+        <!-- Dynamic rows will be added here by JS -->
+    </div>
+    <button type="button" id="add-exercise-row" class="btn btn-success btn-sm mb-3"><i class="bi bi-plus-circle"></i> Add Exercise</button>
+
+    {# Template row (hidden) #}
+    <div id="exercise-row-template" class="exercise-row" style="display: none;">
+        <div>
+           <label class="form-label form-label-sm">Exercise</label>
+           <select name="exercise_id" class="form-select exercise-select" required>
+               <option value="" selected disabled>-- Select Exercise --</option>
+               {# Options will be loaded via JS/API #}
+           </select>
+        </div>
+        <div>
+            <label class="form-label form-label-sm">Category</label>
+            <select name="category" class="form-select category-select" required>
+                <option value="" selected disabled>-- Category --</option>
+                {# Use workout_categories passed from the view #}
+                {% for cat_value in workout_categories %}
+                <option value="{{ cat_value }}">{{ cat_value }}</option>
+                {% endfor %}
+            </select>
+        </div>
+         <div>
+            <label class="form-label form-label-sm">Sets</label>
+            <input type="number" name="sets" class="form-control sets-input" min="1" step="1" required>
+        </div>
+         <div>
+            <label class="form-label form-label-sm">Reps</label>
+            <input type="text" name="reps" class="form-control reps-input" placeholder="e.g., 8-10" required>
+        </div>
+         <div>
+            <label class="form-label form-label-sm">Rest</label>
+            <input type="text" name="rest" class="form-control rest-input" placeholder="e.g., 60s">
+        </div>
+        <div>
+            <label class="form-label form-label-sm">Notes</label>
+            <input type="text" name="exercise_notes" class="form-control notes-input">
+        </div>
+        <button type="button" class="btn btn-sm btn-danger remove-exercise-btn" title="Remove Exercise"><i class="bi bi-trash"></i></button>
+    </div>
+
+    {# Submit button rendered directly #}
+    <div class="mt-4">
+         {{ form.submit(class='btn btn-primary', id='submit-program') }}
+         <a href="{{ url_for('list_workout_programs') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/program_builder.js') }}"></script>
+{% endblock %}

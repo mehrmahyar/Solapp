@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+{% import '_formhelpers.html' as forms %}
+
+{% block title %}{{ title }} - {{ client.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ title }} <small class="text-muted">({{ client.name }})</small></h1>
+    <a href="{{ url_for('view_client', client_id=client.id, _anchor='tests') }}" class="btn btn-secondary btn-sm">Back to Player Profile</a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h4 class="mb-3">Set/Update Baseline Value</h4>
+        <form method="POST" action="" novalidate>
+            {{ form.hidden_tag() }}
+            {{ forms.render_field(form.test_type) }}
+            {{ forms.render_field(form.value) }}
+            {{ forms.render_field(form.date_set) }}
+            {{ forms.render_field(form.submit, class='btn btn-primary') }}
+        </form>
+    </div>
+    <div class="col-md-6">
+        <h4 class="mb-3">Current Baselines Set</h4>
+        {% if baselines %}
+            <table class="table table-sm table-bordered">
+                <thead><tr><th>Test</th><th>Value</th><th>Date Set</th></tr></thead>
+                <tbody>
+                    {% for baseline in baselines %}
+                    <tr><td>{{ baseline.test_type.value }}</td><td>{{ baseline.value }}</td><td>{{ baseline.date_set.strftime('%Y-%m-%d') }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="alert alert-info">No baselines set for this player yet.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 
