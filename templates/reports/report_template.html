@@ -37,8 +37,28 @@
     {% elif report_type == 'team' and team %}
      <h2>Team Summary</h2>
      <p>Team: <strong>{{ team.name }}</strong></p>
-     <p>Number of Players: {{ team.players|length }}</p>
-     <!-- Add more team summary stats if calculated in get_report_data -->
+     <p>Number of Players in Team: {{ team.players|length }}</p>
+        {% if team_aggregates %}
+            <dl class="summary-dl">
+                {% if team_aggregates.avg_readiness_score is defined %}
+                    <dt>Avg. Readiness Score:</dt><dd>{{ team_aggregates.avg_readiness_score }} (Min: {{ team_aggregates.min_readiness_score }}, Max: {{ team_aggregates.max_readiness_score }})</dd>
+                {% endif %}
+                {% if team_aggregates.readiness_reporting_players is defined %}
+                    <dt>Players Reporting Readiness:</dt><dd>{{ team_aggregates.readiness_reporting_players }}</dd>
+                {% endif %}
+                 {% if team_aggregates.avg_cmj is defined %}
+                    <dt>Avg. CMJ (cm):</dt><dd>{{ team_aggregates.avg_cmj }} (Max: {{ team_aggregates.max_cmj }})</dd>
+                {% endif %}
+                {% if team_aggregates.avg_weight is defined %}
+                    <dt>Avg. Weight (kg):</dt><dd>{{ team_aggregates.avg_weight }}</dd>
+                {% endif %}
+                {% if team_aggregates.avg_body_fat is defined %}
+                    <dt>Avg. Body Fat (%):</dt><dd>{{ team_aggregates.avg_body_fat }}</dd>
+                {% endif %}
+            </dl>
+        {% else %}
+            <p class="no-data">No aggregate data calculated for the team in this period.</p>
+        {% endif %}
     {% endif %}
 
     <!-- === Readiness Section === -->

@@ -25,14 +25,14 @@ class Client(db.Model):
     position = db.Column(db.String(50), nullable=True) # Added from CHATGPT solution
 
     # Relationships
-    health_questionnaires = db.relationship('HealthQuestionnaire', backref='client', lazy=True, uselist=False) # One-to-one assuming latest
-    progress_photos = db.relationship('ProgressPhoto', backref='client', lazy=True, order_by="desc(ProgressPhoto.upload_date)")
-    body_compositions = db.relationship('BodyComposition', backref='client', lazy=True, order_by="desc(BodyComposition.date)")
-    physical_tests = db.relationship('PhysicalTest', backref='client', lazy=True, order_by="desc(PhysicalTest.date)")
-    workout_programs = db.relationship('WorkoutProgram', backref='client', lazy=True, order_by="desc(WorkoutProgram.date)")
-    training_sessions = db.relationship('TrainingSession', backref='client', lazy=True, order_by="desc(TrainingSession.date)")
-    readiness_entries = db.relationship('Readiness', backref='client', lazy=True, order_by="desc(Readiness.date)")
-    baselines = db.relationship('Baseline', backref='client', lazy=True)
+    health_questionnaires = db.relationship('HealthQuestionnaire', backref='client', lazy=True, uselist=False, cascade="all, delete-orphan") # One-to-one assuming latest
+    progress_photos = db.relationship('ProgressPhoto', backref='client', lazy=True, order_by="desc(ProgressPhoto.upload_date)", cascade="all, delete-orphan")
+    body_compositions = db.relationship('BodyComposition', backref='client', lazy=True, order_by="desc(BodyComposition.date)", cascade="all, delete-orphan")
+    physical_tests = db.relationship('PhysicalTest', backref='client', lazy=True, order_by="desc(PhysicalTest.date)", cascade="all, delete-orphan")
+    workout_programs = db.relationship('WorkoutProgram', backref='client', lazy=True, order_by="desc(WorkoutProgram.date)", cascade="all, delete-orphan")
+    training_sessions = db.relationship('TrainingSession', backref='client', lazy=True, order_by="desc(TrainingSession.date)", cascade="all, delete-orphan")
+    readiness_entries = db.relationship('Readiness', backref='client', lazy=True, order_by="desc(Readiness.date)", cascade="all, delete-orphan")
+    baselines = db.relationship('Baseline', backref='client', lazy=True, cascade="all, delete-orphan")
 
     # Indexes for common lookups
     __table_args__ = (db.Index('ix_clients_name', 'name'),

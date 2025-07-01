@@ -13,14 +13,86 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-body">
-                <form method="POST" action="" enctype="multipart/form-data">
+                {# Set form ID specifically for TrainingSessionForm and pass existing logs data #}
+                <form method="POST" action="" enctype="multipart/form-data"
+                      id="{{ 'session-log-form' if form.meta.csrf_field.form.id == 'TrainingSessionForm' else 'health-questionnaire-form' if form.meta.csrf_field.form.id == 'HealthQuestionnaireForm' else '' }}"
+                      {% if form.meta.csrf_field.form.id == 'TrainingSessionForm' and existing_session_logs_json is defined %}
+                          data-existing-logs='{{ existing_session_logs_json }}'
+                      {% endif %}
+                      >
                     {{ form.hidden_tag() }}
-                    {% for field in form if field.type != 'CSRFTokenField' and field.type != 'SubmitField' %}
-                        {{ forms.render_field(field) }}
-                    {% endfor %}
+
+                    {# Standard field rendering for most forms #}
+                    {% if form.meta.csrf_field.form.id != 'HealthQuestionnaireForm' %}
+                        {% for field in form if field.type != 'CSRFTokenField' and field.type != 'SubmitField' and field.id != 'session_logs_json_data' %}
+                            {{ forms.render_field(field) }}
+                        {% endfor %}
+                    {% endif %}
+
+                    {# Custom rendering for HealthQuestionnaireForm based on health_questions from context #}
+                    {% if form.meta.csrf_field.form.id == 'HealthQuestionnaireForm' and health_questions %}
+                        <h5>Health Questions</h5>
+                        {% for question in health_questions %}
+                            {% set field = form['q_' + question.id] %}
+                            {% if field %}
+                                {# You can add conditional rendering based on question.conditions here with JS if needed #}
+                                <div class="mb-3 question-item"
+                                     data-question-id="{{ question.id }}"
+                                     {% if question.conditions %}data-condition-target="{{ question.conditions.keys()|first }}" data-condition-value="{{ question.conditions.values()|first }}" style="display:none;"{% endif %}>
+                                    {{ forms.render_field(field) }}
+                                    {# The label is part of the field itself from forms.py for BooleanFields too now #}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+
+                    {# Special section for Training Session Log Builder #}
+                    {% if form.meta.csrf_field.form.id == 'TrainingSessionForm' %} {# Check form name/type indirectly #}
+                        <hr>
+                        <h5><i class="bi bi-journal-text"></i> Detailed Session Logs</h5>
+                        <div id="session-log-list-container" class="mb-3">
+                            <!-- Dynamic log rows will be added here by session_logger.js -->
+                        </div>
+                        <button type="button" id="add-session-log-row" class="btn btn-success btn-sm mb-3">
+                            <i class="bi bi-plus-circle"></i> Add Log Entry
+                        </button>
+
+                        {# Template row for session logs (hidden) #}
+                        <div id="session-log-row-template" class="session-log-row-template" style="display: none;">
+                             <div class="row align-items-center mb-2 p-2 border rounded bg-light exercise-log-entry-dynamic">
+                                <div class="col-md-4">
+                                    <label class="form-label form-label-sm">Exercise</label>
+                                    <select name="exercise_id" class="form-select form-select-sm exercise-select">
+                                        <option value="" selected disabled>-- Select Exercise --</option>
+                                        {# Options loaded by JS #}
+                                    </select>
+                                </div>
+                                <div class="col-md-1">
+                                    <label class="form-label form-label-sm">Reps</label>
+                                    <input type="number" name="log_reps" class="form-control form-control-sm log-reps-input" min="0">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label form-label-sm">Weight</label>
+                                    <input type="number" step="any" name="log_weight" class="form-control form-control-sm log-weight-input" min="0">
+                                </div>
+                                 <div class="col-md-1">
+                                    <label class="form-label form-label-sm">RPE</label>
+                                    <input type="number" step="0.5" name="log_set_rpe" class="form-control form-control-sm log-set-rpe-input" min="0" max="10">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label form-label-sm">Notes</label>
+                                    <input type="text" name="log_notes" class="form-control form-control-sm log-notes-input">
+                                </div>
+                                <div class="col-md-1 align-self-end">
+                                    <button type="button" class="btn btn-sm btn-danger remove-log-row-btn" title="Remove Log Entry"><i class="bi bi-trash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        {{ form.session_logs_json_data() }} {# Render the hidden field #}
+                    {% endif %}
 
                     {% if instructions %}
-                        <div class="alert alert-info small">{{ instructions }}</div>
+                        <div class="alert alert-info small mt-3">{{ instructions }}</div>
                     {% endif %}
                     {% if json_instructions %}
                         <div class="alert alert-secondary small">
@@ -40,4 +112,10 @@
         </div>
     </div>
 </div>
-{% endblock %} 
+{% endblock %}
+
+{% block scripts %}
+    {% if form.meta.csrf_field.form.id == 'TrainingSessionForm' %}
+        <script src="{{ url_for('static', filename='js/session_logger.js') }}"></script>
+    {% endif %}
+{% endblock %}

@@ -4,11 +4,15 @@
   <nav aria-label="Page navigation">
     <ul class="pagination justify-content-center">
       {# Previous Page Link #}
+{% macro render_pagination(pagination, endpoint, fragment='', page_param_name='page') %}
+  <nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+      {# Previous Page Link #}
       <li class="page-item {{ 'disabled' if not pagination.has_prev else '' }}">
         {% set prev_url_kwargs = {} %}
         {% do prev_url_kwargs.update(request.view_args) %}
         {% do prev_url_kwargs.update(request.args) %}
-        {% do prev_url_kwargs.update({'page': pagination.prev_num}) %}
+        {% do prev_url_kwargs.update({page_param_name: pagination.prev_num}) %}
         <a class="page-link" href="{{ url_for(endpoint, **prev_url_kwargs) }}{{ '#' + fragment if fragment else '' }}" aria-label="Previous">
           <span aria-hidden="true">&laquo;</span>
         </a>
@@ -22,7 +26,7 @@
               {% set page_url_kwargs = {} %}
               {% do page_url_kwargs.update(request.view_args) %}
               {% do page_url_kwargs.update(request.args) %}
-              {% do page_url_kwargs.update({'page': page_num}) %}
+              {% do page_url_kwargs.update({page_param_name: page_num}) %}
               <a class="page-link" href="{{ url_for(endpoint, **page_url_kwargs) }}{{ '#' + fragment if fragment else '' }}">{{ page_num }}</a>
             </li>
           {% else %}
@@ -40,7 +44,7 @@
         {% set next_url_kwargs = {} %}
         {% do next_url_kwargs.update(request.view_args) %}
         {% do next_url_kwargs.update(request.args) %}
-        {% do next_url_kwargs.update({'page': pagination.next_num}) %}
+        {% do next_url_kwargs.update({page_param_name: pagination.next_num}) %}
         <a class="page-link" href="{{ url_for(endpoint, **next_url_kwargs) }}{{ '#' + fragment if fragment else '' }}" aria-label="Next">
           <span aria-hidden="true">&raquo;</span>
         </a>

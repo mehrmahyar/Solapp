@@ -85,7 +85,7 @@ def list_teams():
     try:
         page = request.args.get('page', 1, type=int)
         teams_query = Team.query.order_by(Team.name)
-        pagination = teams_query.paginate(page=page, per_page=15, error_out=False)
+        pagination = teams_query.paginate(page=page, per_page=app.config['DEFAULT_LIST_PER_PAGE'], error_out=False)
         teams = pagination.items
     except Exception as e:
         app.logger.error(f"Error fetching teams: {e}")
@@ -149,7 +149,7 @@ def list_clients():
         page = request.args.get('page', 1, type=int)
         # Use outerjoin to include clients without teams, order by team name (None first), then client name
         clients_query = Client.query.outerjoin(Team).order_by(Team.name.nullsfirst(), Client.name)
-        pagination = clients_query.paginate(page=page, per_page=15, error_out=False) # Configurable per_page
+        pagination = clients_query.paginate(page=page, per_page=app.config['DEFAULT_LIST_PER_PAGE'], error_out=False)
         clients = pagination.items
     except Exception as e:
         app.logger.error(f"Error fetching clients: {e}")
@@ -278,7 +278,42 @@ def view_client(client_id):
     physical_tests = PhysicalTest.query.filter_by(client_id=client_id).order_by(PhysicalTest.date.desc(), PhysicalTest.test_type).limit(20).all() # Example: Limit last 20
     baselines = Baseline.query.filter_by(client_id=client_id).order_by(Baseline.test_type).all()
     training_sessions = TrainingSession.query.filter_by(client_id=client_id).order_by(TrainingSession.date.desc()).limit(10).all() # Example: Limit last 10
-    readiness_entries = Readiness.query.filter_by(client_id=client_id).order_by(Readiness.date.desc()).limit(10).all() # Example: Limit last 10
+
+    # Paginate Readiness Entries
+    page_readiness = request.args.get('page_readiness', 1, type=int)
+    readiness_pagination = Readiness.query.filter_by(client_id=client_id)\
+                                       .order_by(Readiness.date.desc())\
+                                       .paginate(page=page_readiness, per_page=app.config['CLIENT_VIEW_READINESS_PER_PAGE'], error_out=False)
+    readiness_entries = readiness_pagination.items
+
+    # Paginate Body Compositions
+    page_bodycomp = request.args.get('page_bodycomp', 1, type=int)
+    bodycomp_pagination = BodyComposition.query.filter_by(client_id=client_id)\
+                                           .order_by(BodyComposition.date.desc())\
+                                           .paginate(page=page_bodycomp, per_page=app.config['CLIENT_VIEW_BODYCOMP_PER_PAGE'], error_out=False)
+    body_comps = bodycomp_pagination.items
+
+    # Paginate Physical Tests
+    page_tests = request.args.get('page_tests', 1, type=int)
+    tests_pagination = PhysicalTest.query.filter_by(client_id=client_id)\
+                                       .order_by(PhysicalTest.date.desc(), PhysicalTest.test_type)\
+                                       .paginate(page=page_tests, per_page=app.config['CLIENT_VIEW_TESTS_PER_PAGE'], error_out=False)
+    physical_tests = tests_pagination.items
+
+    # Paginate Training Sessions
+    page_sessions = request.args.get('page_sessions', 1, type=int)
+    sessions_pagination = TrainingSession.query.filter_by(client_id=client_id)\
+                                             .order_by(TrainingSession.date.desc())\
+                                             .paginate(page=page_sessions, per_page=app.config['CLIENT_VIEW_SESSIONS_PER_PAGE'], error_out=False)
+    training_sessions = sessions_pagination.items
+
+    # Paginate Progress Photos
+    page_photos = request.args.get('page_photos', 1, type=int)
+    photos_pagination = ProgressPhoto.query.filter_by(client_id=client_id)\
+                                         .order_by(ProgressPhoto.upload_date.desc())\
+                                         .paginate(page=page_photos, per_page=app.config['CLIENT_VIEW_PHOTOS_PER_PAGE'], error_out=False)
+    progress_photos = photos_pagination.items
+
 
     return render_template('clients/view.html', client=client,
                            readiness_plot_html=readiness_plot_html,
@@ -287,12 +322,17 @@ def view_client(client_id):
                            today_program=today_program,
                            program_exercises=program_exercises,
                            health_questionnaire=health_questionnaire,
-                           progress_photos=progress_photos,
-                           body_comps=body_comps,
-                           physical_tests=physical_tests,
+                           progress_photos=progress_photos, # paginated items
+                           photos_pagination=photos_pagination, # pagination object
+                           body_comps=body_comps, # paginated items
+                           bodycomp_pagination=bodycomp_pagination, # pagination object
+                           physical_tests=physical_tests, # paginated items
+                           tests_pagination=tests_pagination, # pagination object
                            baselines=baselines,
-                           training_sessions=training_sessions,
-                           readiness_entries=readiness_entries)
+                           training_sessions=training_sessions, # paginated items
+                           sessions_pagination=sessions_pagination, # pagination object
+                           readiness_entries=readiness_entries, # paginated items
+                           readiness_pagination=readiness_pagination) # pagination object for nav
 
 
 @app.route('/clients/delete/<int:client_id>', methods=['POST'])
@@ -304,6 +344,7 @@ def delete_client(client_id):
     app.logger.info(f"Attempting to delete client {client_id} ('{client_name}') and associated data.")
     try:
         # Delete associated photos from filesystem first
+        # This still needs to be done manually as cascade doesn't handle filesystem objects.
         photos_to_delete = ProgressPhoto.query.filter_by(client_id=client_id).all()
         for photo in photos_to_delete:
             try:
@@ -314,18 +355,7 @@ def delete_client(client_id):
             except Exception as e:
                 app.logger.error(f"Error deleting photo file {photo.photo_path}: {e}")
 
-        # Manually delete related data first using bulk deletes (cascade might be better long-term)
-        HealthQuestionnaire.query.filter_by(client_id=client_id).delete()
-        ProgressPhoto.query.filter_by(client_id=client_id).delete()
-        BodyComposition.query.filter_by(client_id=client_id).delete()
-        PhysicalTest.query.filter_by(client_id=client_id).delete()
-        Baseline.query.filter_by(client_id=client_id).delete()
-        # WorkoutProgram assignment - if client specific, delete here too
-        WorkoutProgram.query.filter_by(client_id=client_id).delete()
-        TrainingSession.query.filter_by(client_id=client_id).delete()
-        Readiness.query.filter_by(client_id=client_id).delete()
-
-        # Finally, delete the client record
+        # SQLAlchemy will handle deletion of related DB records due to cascade="all, delete-orphan"
         db.session.delete(client)
         db.session.commit()
         flash(f'Player "{client_name}" and associated data deleted successfully!', 'success')
@@ -342,72 +372,124 @@ def delete_client(client_id):
 def add_health_questionnaire(client_id):
     client = Client.query.get_or_404(client_id)
     existing_hq = HealthQuestionnaire.query.filter_by(client_id=client_id).first()
-    form = HealthQuestionnaireForm()
-
-    if existing_hq and request.method == 'GET':
-        try:
-            responses_dict = existing_hq.responses or {}
-            # Keep simple text format for now
-            form.responses_text.data = "\n".join([f"{k}={v}" for k, v in responses_dict.items()])
-        except Exception as e:
-            app.logger.warning(f"Could not prefill questionnaire for client {client_id}: {e}")
-            form.responses_text.data = str(existing_hq.responses) # Fallback
+    form = HealthQuestionnaireForm() # This will now be a dynamic form
 
     if form.validate_on_submit():
-        # Basic parsing from text area - needs robust implementation
         responses_dict = {}
-        for line in form.responses_text.data.strip().split('\n'):
-            if '=' in line:
-                try:
-                    key, value = line.split('=', 1)
-                    responses_dict[key.strip()] = value.strip()
-                except ValueError:
-                     app.logger.warning(f"Skipping invalid line in questionnaire input: {line}")
-                     continue # Skip malformed lines
+        for question_config in Config.HEALTH_QUESTIONNAIRE_QUESTIONS:
+            field_id = f"q_{question_config['id']}"
+            field = getattr(form, field_id, None)
+            if field:
+                responses_dict[question_config['id']] = field.data
 
-        if not responses_dict:
-             flash('No valid questionnaire data entered (use format: Question=Answer).', 'warning')
+        if existing_hq:
+            existing_hq.responses = responses_dict
+            action = "updated"
         else:
-            if existing_hq:
-                existing_hq.responses = responses_dict
-                action = "updated"
-            else:
-                hq = HealthQuestionnaire(client_id=client_id, responses=responses_dict)
-                db.session.add(hq)
-                action = "saved"
-            try:
-                db.session.commit()
-                flash(f'Health Questionnaire {action}.', 'success')
-                return redirect(url_for('view_client', client_id=client_id, _anchor='health'))
-            except Exception as e:
-                db.session.rollback()
-                app.logger.error(f"Error saving questionnaire for client {client_id}: {e}")
-                flash(f'Error saving questionnaire: {e}', 'danger')
+            hq = HealthQuestionnaire(client_id=client_id, responses=responses_dict)
+            db.session.add(hq)
+            action = "saved"
+        try:
+            db.session.commit()
+            flash(f'Health Questionnaire {action}.', 'success')
+            return redirect(url_for('view_client', client_id=client_id, _anchor='health'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error saving questionnaire for client {client_id}: {e}")
+            flash(f'Error saving questionnaire: {e}', 'danger')
+
+    elif request.method == 'GET' and existing_hq:
+        # Pre-fill form with existing data
+        if existing_hq.responses:
+            for question_id, answer in existing_hq.responses.items():
+                field_id = f"q_{question_id}"
+                field = getattr(form, field_id, None)
+                if field:
+                    # WTForms handles type conversion for BooleanField, etc.
+                    field.data = answer
 
     title = "Edit Health Questionnaire" if existing_hq else "Add Health Questionnaire"
-    return render_template('data_entry/generic_form.html', form=form, title=title, client=client,
-                           instructions="Enter health details using the format 'Question=Answer' on each line.")
+    # Pass questions to template for rendering help text or conditional logic if needed
+    return render_template('data_entry/generic_form.html',
+                           form=form,
+                           title=title,
+                           client=client,
+                           health_questions=Config.HEALTH_QUESTIONNAIRE_QUESTIONS, # Pass questions for template
+                           instructions=None) # Remove old instructions
 
 
 @app.route('/clients/<int:client_id>/add_progress_photo', methods=['GET', 'POST'])
 def add_progress_photo(client_id):
     client = Client.query.get_or_404(client_id)
     form = ProgressPhotoForm()
+    if request.content_length > app.config['MAX_CONTENT_LENGTH']:
+        flash(f"File too large. Maximum size is {app.config['MAX_CONTENT_LENGTH']//1024//1024}MB.", 'danger')
+        return redirect(request.url) # Redirect back to the form
+
     if form.validate_on_submit():
         file = form.photo.data
         if file and allowed_file(file.filename):
+            # Basic magic number check
+            magic_numbers = {
+                b"\xff\xd8\xff": "image/jpeg", # JPEG
+                b"\x89PNG\r\n\x1a\n": "image/png", # PNG
+                b"GIF87a": "image/gif", # GIF
+                b"GIF89a": "image/gif", # GIF
+            }
+            file_header = file.read(8) # Read first 8 bytes
+            file.seek(0) # Reset stream position
+
+            is_valid_image = False
+            for magic, mime in magic_numbers.items():
+                if file_header.startswith(magic):
+                    # Optional: could check against file.content_type if provided by browser
+                    is_valid_image = True
+                    break
+
+            if not is_valid_image:
+                flash('Invalid image file content.', 'danger')
+                return redirect(request.url)
+
             # Create a more unique filename
             timestamp = date.today().strftime('%Y%m%d')
             random_hex = os.urandom(4).hex()
             original_filename = secure_filename(file.filename)
             # Sanitize angle for filename
             safe_angle = secure_filename(form.angle.data or 'photo')
-            filename = f"{client_id}_{timestamp}_{safe_angle}_{random_hex}_{original_filename}"
+            base, ext = os.path.splitext(original_filename)
+            # Ensure extension is one of our allowed ones, default to .jpg if processing changes format.
+            # Pillow will save in JPEG format if 'optimize' or 'quality' options are used for non-JPEGs.
+            # For simplicity, let's aim to save processed images as JPEG.
+            filename = f"{client_id}_{timestamp}_{safe_angle}_{random_hex}_{base}.jpg"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
             try:
-                # Consider image resizing/compression here using Pillow
-                file.save(filepath)
-                app.logger.info(f"Saved photo file: {filepath}")
+                from PIL import Image
+                img = Image.open(file.stream)
+
+                # Preserve orientation if possible
+                try:
+                    if hasattr(img, '_getexif'):
+                        exif = img._getexif()
+                        if exif:
+                            orientation_key = 274 # EXIF tag for Orientation
+                            if orientation_key in exif:
+                                orientation = exif[orientation_key]
+                                if orientation == 3: img = img.rotate(180, expand=True)
+                                elif orientation == 6: img = img.rotate(270, expand=True)
+                                elif orientation == 8: img = img.rotate(90, expand=True)
+                except Exception as exif_e:
+                    app.logger.warning(f"Could not process EXIF orientation: {exif_e}")
+
+                # Convert to RGB if it's RGBA (e.g. PNG with alpha) to save as JPEG
+                if img.mode == 'RGBA' or img.mode == 'P': # P is for paletted images like GIF
+                    img = img.convert('RGB')
+
+                img.thumbnail((app.config['MAX_IMAGE_WIDTH'], app.config['MAX_IMAGE_HEIGHT']))
+
+                img.save(filepath, 'JPEG', quality=app.config['IMAGE_QUALITY'], optimize=True)
+                app.logger.info(f"Saved and optimized photo file: {filepath}")
+
                 photo = ProgressPhoto(
                     client_id=client_id,
                     upload_date=form.upload_date.data,
@@ -474,6 +556,94 @@ def add_body_composition(client_id):
             app.logger.error(f"Error saving body comp for client {client_id}: {e}")
             flash(f'Error saving Body Composition: {e}', 'danger')
     return render_template('data_entry/generic_form.html', form=form, title="Add Body Composition Entry", client=client)
+
+@app.route('/clients/<int:client_id>/edit_body_composition/<int:entry_id>', methods=['GET', 'POST'])
+def edit_body_composition(client_id, entry_id):
+    client = Client.query.get_or_404(client_id)
+    entry = BodyComposition.query.filter_by(id=entry_id, client_id=client_id).first_or_404()
+    form = BodyCompositionForm(obj=entry) # Reuse form, pre-populate with entry data
+
+    if form.validate_on_submit():
+        entry.date = form.date.data
+        entry.weight = form.weight.data
+        entry.height = form.height.data
+        entry.body_fat = form.body_fat.data
+        entry.muscle_mass = form.muscle_mass.data
+        try:
+            db.session.commit()
+            flash('Body Composition entry updated.', 'success')
+            return redirect(url_for('view_client', client_id=client_id, _anchor='bodycomp'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error updating body comp entry {entry_id} for client {client_id}: {e}")
+            flash(f'Error updating Body Composition: {e}', 'danger')
+
+    return render_template('data_entry/generic_form.html', form=form, title="Edit Body Composition Entry", client=client, entry_id=entry_id)
+
+@app.route('/clients/<int:client_id>/delete_body_composition/<int:entry_id>', methods=['POST'])
+def delete_body_composition(client_id, entry_id):
+    # Ensure client exists and owns the entry, though filter_by below handles this too
+    Client.query.get_or_404(client_id)
+    entry = BodyComposition.query.filter_by(id=entry_id, client_id=client_id).first_or_404()
+    try:
+        db.session.delete(entry)
+        db.session.commit()
+        flash('Body Composition entry deleted.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting body comp entry {entry_id} for client {client_id}: {e}")
+        flash(f'Error deleting entry: {e}', 'danger')
+    return redirect(url_for('view_client', client_id=client_id, _anchor='bodycomp'))
+
+@app.route('/clients/<int:client_id>/edit_physical_test/<int:entry_id>', methods=['GET', 'POST'])
+def edit_physical_test(client_id, entry_id):
+    client = Client.query.get_or_404(client_id)
+    entry = PhysicalTest.query.filter_by(id=entry_id, client_id=client_id).first_or_404()
+    # When pre-filling, form expects enum *name* for SelectField, but entry.test_type is the enum object.
+    form_obj_data = entry.__dict__
+    form_obj_data['test_type'] = entry.test_type.name
+    form = PhysicalTestForm(data=form_obj_data)
+
+
+    if form.validate_on_submit():
+        try:
+            entry.test_type = TestTypeEnum[form.test_type.data]
+        except KeyError:
+            flash(f"Invalid test type: {form.test_type.data}", 'danger')
+            return render_template('data_entry/generic_form.html', form=form, title="Edit Physical Test Result", client=client, entry_id=entry_id)
+
+        entry.date = form.date.data
+        entry.value = form.value.data
+        entry.notes = form.notes.data
+        try:
+            db.session.commit()
+            flash(f'{entry.test_type.value} test result updated.', 'success')
+            return redirect(url_for('view_client', client_id=client_id, _anchor='tests'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error updating physical test entry {entry_id} for client {client_id}: {e}")
+            flash(f'Error updating test result: {e}', 'danger')
+
+    # For GET request, ensure form is populated correctly with enum name
+    if request.method == 'GET':
+        form.test_type.data = entry.test_type.name # Ensure select field shows current value
+
+    return render_template('data_entry/generic_form.html', form=form, title="Edit Physical Test Result", client=client, entry_id=entry_id)
+
+@app.route('/clients/<int:client_id>/delete_physical_test/<int:entry_id>', methods=['POST'])
+def delete_physical_test(client_id, entry_id):
+    Client.query.get_or_404(client_id)
+    entry = PhysicalTest.query.filter_by(id=entry_id, client_id=client_id).first_or_404()
+    try:
+        db.session.delete(entry)
+        db.session.commit()
+        flash('Physical Test entry deleted.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting physical test entry {entry_id} for client {client_id}: {e}")
+        flash(f'Error deleting entry: {e}', 'danger')
+    return redirect(url_for('view_client', client_id=client_id, _anchor='tests'))
+
 
 @app.route('/clients/<int:client_id>/add_physical_test', methods=['GET', 'POST'])
 def add_physical_test(client_id):
@@ -633,7 +803,7 @@ def list_exercises():
     try:
         page = request.args.get('page', 1, type=int)
         exercises_query = Exercise.query.order_by(Exercise.name)
-        pagination = exercises_query.paginate(page=page, per_page=15, error_out=False)
+        pagination = exercises_query.paginate(page=page, per_page=app.config['DEFAULT_LIST_PER_PAGE'], error_out=False)
         exercises = pagination.items
     except Exception as e:
         app.logger.error(f"Error fetching exercises: {e}")
@@ -719,7 +889,7 @@ def list_workout_programs():
             .order_by(WorkoutProgram.date.desc())
         )
 
-        pagination = programs_query.paginate(page=page, per_page=10, error_out=False)
+        pagination = programs_query.paginate(page=page, per_page=app.config['PROGRAMS_LIST_PER_PAGE'], error_out=False)
         programs_data = pagination.items # List of tuples (WorkoutProgram, client_name, team_name)
 
         # Pass the pagination object and the queried data to the template
@@ -865,22 +1035,23 @@ def add_training_session(client_id):
 
     if form.validate_on_submit():
         logs_json = None
-        # Should have a dedicated field in TrainingSessionForm for logs, not generic text
-        # Assuming form.logs_json_text for now based on previous code
-        if form.logs_json_text.data:
+        submitted_json_data = form.session_logs_json_data.data
+        if submitted_json_data:
             try:
-                logs_data = json.loads(form.logs_json_text.data)
-                # Basic validation
-                if isinstance(logs_data, dict) and isinstance(logs_data.get('logs'), list):
-                    logs_json = logs_data
+                logs_data_parsed = json.loads(submitted_json_data)
+                # Basic validation: Check if it's a dict with a 'logs' list
+                if isinstance(logs_data_parsed, dict) and isinstance(logs_data_parsed.get('logs'), list):
+                    # Further validation could check keys within each log item
+                    logs_json = logs_data_parsed # Use the parsed and validated JSON
                 else:
                     raise ValueError("JSON must be a dictionary with a 'logs' list.")
             except (json.JSONDecodeError, ValueError) as json_e:
                 flash(f'Invalid JSON format for session logs: {json_e}', 'danger')
-                # Re-render form with error
-                json_instructions = "Enter session logs as JSON..." # Simplified
-                return render_template('data_entry/generic_form.html', form=form, title="Log Training Session", client=client, json_instructions=json_instructions)
-
+                # Re-render form with error - need to ensure template can handle this
+                # The generic_form.html might not be suitable anymore if we have a complex JS builder
+                # For now, will redirect to the same form, assuming it can repopulate other fields.
+                # Consider passing existing_logs_json back to the template for the JS to repopulate.
+                return render_template('data_entry/generic_form.html', form=form, title="Log Training Session", client=client, json_instructions="Error in submitted log data.")
 
         session = TrainingSession(
             client_id=client_id,
@@ -916,8 +1087,63 @@ def add_training_session(client_id):
     )
     return render_template('data_entry/generic_form.html', form=form, title="Log Training Session", client=client, json_instructions=json_instructions)
 
+@app.route('/clients/<int:client_id>/edit_training_session/<int:entry_id>', methods=['GET', 'POST'])
+def edit_training_session(client_id, entry_id):
+    client = Client.query.get_or_404(client_id)
+    session_entry = TrainingSession.query.filter_by(id=entry_id, client_id=client_id).first_or_404()
+    form = TrainingSessionForm(client_id=client_id, obj=session_entry) # Pass client_id for program choices
 
-# TODO: View/Edit/Delete Training Session routes
+    if form.validate_on_submit():
+        session_entry.date = form.date.data
+        session_entry.workout_program_id = form.workout_program_id.data or None
+        session_entry.duration_minutes = form.duration_minutes.data
+        session_entry.session_rpe = form.session_rpe.data
+        session_entry.session_rating = form.session_rating.data
+
+        submitted_json_data = form.session_logs_json_data.data
+        if submitted_json_data:
+            try:
+                logs_data_parsed = json.loads(submitted_json_data)
+                if isinstance(logs_data_parsed, dict) and isinstance(logs_data_parsed.get('logs'), list):
+                    session_entry.logs = logs_data_parsed
+                else:
+                    raise ValueError("JSON must be a dictionary with a 'logs' list.")
+            except (json.JSONDecodeError, ValueError) as json_e:
+                flash(f'Invalid JSON format for session logs: {json_e}', 'danger')
+                # Need to pass existing logs back to template for JS to repopulate
+                existing_logs_json_str = json.dumps(session_entry.logs) if session_entry.logs else 'null'
+                return render_template('data_entry/generic_form.html', form=form, title="Edit Training Session",
+                                       client=client, entry_id=entry_id, existing_session_logs_json=existing_logs_json_str)
+        else:
+            session_entry.logs = None # Clear logs if nothing submitted
+
+        try:
+            db.session.commit()
+            flash('Training session updated.', 'success')
+            return redirect(url_for('view_client', client_id=client_id, _anchor='sessions'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error updating training session {entry_id} for client {client_id}: {e}")
+            flash(f'Error updating session: {e}', 'danger')
+
+    # For GET request, pass existing logs JSON to the template for JS pre-fill
+    existing_logs_json_str = json.dumps(session_entry.logs) if session_entry.logs else 'null'
+    return render_template('data_entry/generic_form.html', form=form, title="Edit Training Session",
+                           client=client, entry_id=entry_id, existing_session_logs_json=existing_logs_json_str)
+
+@app.route('/clients/<int:client_id>/delete_training_session/<int:entry_id>', methods=['POST'])
+def delete_training_session(client_id, entry_id):
+    Client.query.get_or_404(client_id)
+    session_entry = TrainingSession.query.filter_by(id=entry_id, client_id=client_id).first_or_404()
+    try:
+        db.session.delete(session_entry)
+        db.session.commit()
+        flash('Training session deleted.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting training session {entry_id} for client {client_id}: {e}")
+        flash(f'Error deleting session: {e}', 'danger')
+    return redirect(url_for('view_client', client_id=client_id, _anchor='sessions'))
 
 # -- Reports --
 @app.route('/reports', methods=['GET', 'POST'])
@@ -1001,6 +1227,58 @@ def api_get_exercises():
     except Exception as e:
         app.logger.error(f"API Error fetching exercises: {e}")
         return jsonify({"error": "Could not fetch exercises"}), 500
+
+@app.route('/api/workout_programs/<int:program_id>/exercises_detailed')
+def api_get_program_exercises(program_id):
+    program = WorkoutProgram.query.get_or_404(program_id)
+    if not program:
+        return jsonify({"error": "Program not found"}), 404
+
+    # Enrich exercise details with names from Exercise table
+    if program.exercises_json and 'exercises' in program.exercises_json:
+        exercise_data = program.exercises_json.get('exercises', [])
+        exercise_ids = [item.get('exercise_id') for item in exercise_data if item.get('exercise_id')]
+
+        # Convert IDs to int, filtering out non-integers robustly
+        valid_exercise_ids = []
+        for eid in exercise_ids:
+            try:
+                valid_exercise_ids.append(int(eid))
+            except (ValueError, TypeError):
+                app.logger.warning(f"Invalid exercise_id found in program {program_id}: {eid}")
+
+        exercises_db = {ex.id: ex for ex in Exercise.query.filter(Exercise.id.in_(valid_exercise_ids)).all()}
+
+        enriched_exercises = []
+        for item in exercise_data:
+            exercise_id_val = item.get('exercise_id')
+            try:
+                exercise_id_int = int(exercise_id_val)
+                exercise_obj = exercises_db.get(exercise_id_int)
+                if exercise_obj:
+                    item['exercise_name'] = exercise_obj.name
+                    item['video_url'] = exercise_obj.video_url
+                else:
+                    item['exercise_name'] = 'Unknown Exercise (ID not found)'
+            except (ValueError, TypeError):
+                 item['exercise_name'] = 'Unknown Exercise (Invalid ID)'
+            enriched_exercises.append(item)
+
+        # Return the whole program object or just the exercises part
+        # Returning the original structure with enriched items
+        return jsonify({
+            "id": program.id,
+            "name": program.name,
+            "date": program.date.isoformat(),
+            "exercises_json": {"exercises": enriched_exercises}
+        })
+    else:
+        return jsonify({
+            "id": program.id,
+            "name": program.name,
+            "date": program.date.isoformat(),
+            "exercises_json": {"exercises": []} # Return empty list if no exercises
+        })
 
 # --- Error Handlers ---
 @app.errorhandler(404)

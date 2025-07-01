@@ -20,8 +20,20 @@ def calculate_readiness_score(readiness_entry):
 
     # Subjective Scores (Normalized 0-10, assuming 1-5 input scale)
     # Higher input is better (e.g., 5 = Best/No soreness)
-    factors = {
-        'sleep': readiness_entry.sleep_quality,       # Needs special handling for duration vs quality
+    # Sleep Quality
+    if readiness_entry.sleep_quality is not None and 'sleep_quality' in weights:
+        normalized_sleep_quality = (readiness_entry.sleep_quality - 1) * 2.5 # Scale 1-5 to 0-10
+        score += normalized_sleep_quality * weights['sleep_quality']
+        total_weight += weights['sleep_quality']
+
+    # Sleep Duration (normalized to 8 hours = 10 points)
+    if readiness_entry.sleep_duration is not None and 'sleep_duration' in weights:
+        sleep_duration_norm = min(readiness_entry.sleep_duration / 8.0, 1.25) * 10 # Cap bonus sleep, scale to 10
+        score += sleep_duration_norm * weights['sleep_duration']
+        total_weight += weights['sleep_duration']
+
+    # Other subjective factors
+    subjective_factors = {
         'fatigue': readiness_entry.fatigue_level,
         'soreness': readiness_entry.muscle_soreness,
         'mood': readiness_entry.mood,
@@ -29,29 +41,11 @@ def calculate_readiness_score(readiness_entry):
         'confidence': readiness_entry.confidence
     }
 
-    for key, value in factors.items():
+    for key, value in subjective_factors.items():
         if value is not None and key in weights:
             normalized_score = (value - 1) * 2.5 # Scale 1-5 to 0-10
             score += normalized_score * weights[key]
             total_weight += weights[key]
-
-    # Sleep Duration (Special handling - normalized to 8 hours = 10 points)
-    if readiness_entry.sleep_duration is not None and 'sleep' in weights: # Using 'sleep' weight for duration too
-        sleep_norm = min(readiness_entry.sleep_duration / 8.0, 1.25) * 10 # Cap bonus sleep, scale to 10
-        # Let's average sleep quality and duration score contribution if both exist
-        # This is debatable, could use separate weights or prioritize one
-        if 'sleep' in factors and factors['sleep'] is not None:
-             # Adjust existing score: remove quality part, add average part
-             qual_score = (factors['sleep'] - 1) * 2.5
-             score -= qual_score * weights['sleep']
-             avg_sleep_score = (qual_score + sleep_norm) / 2
-             score += avg_sleep_score * weights['sleep']
-             # total_weight already counted
-        else:
-            # Only duration available
-            score += sleep_norm * weights['sleep']
-            if 'sleep' not in factors or factors['sleep'] is None:
-                 total_weight += weights['sleep'] # Add weight if quality wasn't counted
 
     # Objective Scores (CMJ, Drop Jump) - % of baseline
     cmj_baseline_val = get_baseline_value(client_id, TestTypeEnum.CMJ)
@@ -71,7 +65,7 @@ def calculate_readiness_score(readiness_entry):
 
     # Handle Injury/Pain - Penalize score significantly if pain is reported
     if readiness_entry.injury_pain:
-        score *= 0.7 # Apply a 30% penalty, configurable
+        score *= Config.READINESS_INJURY_PENALTY # Use configurable penalty
 
     # Final score calculation (normalized to 100)
     if total_weight > 0:
@@ -334,26 +328,32 @@ def get_report_data(report_type, entity_id, start_date, end_date):
     else:
         return None # Invalid type
 
+    from sqlalchemy.orm import joinedload
+
     # Fetch data within the date range for the relevant client(s)
-    context['readiness_data'] = Readiness.query.filter(
+    # Eagerly load client relationship to avoid N+1 in templates
+    context['readiness_data'] = Readiness.query.options(joinedload(Readiness.client)).filter(
         Readiness.client_id.in_(client_ids),
         Readiness.date >= start_date,
         Readiness.date <= end_date
     ).order_by(Readiness.date).all()
 
-    context['body_comp_data'] = BodyComposition.query.filter(
+    context['body_comp_data'] = BodyComposition.query.options(joinedload(BodyComposition.client)).filter(
         BodyComposition.client_id.in_(client_ids),
         BodyComposition.date >= start_date,
         BodyComposition.date <= end_date
     ).order_by(BodyComposition.date).all()
 
-    context['physical_test_data'] = PhysicalTest.query.filter(
+    context['physical_test_data'] = PhysicalTest.query.options(joinedload(PhysicalTest.client)).filter(
         PhysicalTest.client_id.in_(client_ids),
         PhysicalTest.date >= start_date,
         PhysicalTest.date <= end_date
     ).order_by(PhysicalTest.date, PhysicalTest.test_type).all()
 
-    context['training_session_data'] = TrainingSession.query.filter(
+    context['training_session_data'] = TrainingSession.query.options(
+        joinedload(TrainingSession.client),
+        joinedload(TrainingSession.workout_program) # Eagerly load workout_program too
+    ).filter(
         TrainingSession.client_id.in_(client_ids),
         TrainingSession.date >= start_date,
         TrainingSession.date <= end_date
@@ -373,7 +373,51 @@ def get_report_data(report_type, entity_id, start_date, end_date):
                  test_figs[test_type.value] = fig
         context['test_figs'] = test_figs
 
-    # Add aggregated data for team reports if needed (e.g., average readiness)
-    # ... calculations using pandas on the fetched data ...
+    elif report_type == 'team':
+        # --- Calculate Aggregated Data for Team Reports ---
+        team_aggregates = {}
+
+        # 1. Readiness Aggregates
+        if context['readiness_data']:
+            readiness_scores = [r.calculated_readiness_score for r in context['readiness_data'] if r.calculated_readiness_score is not None]
+            if readiness_scores:
+                team_aggregates['avg_readiness_score'] = round(np.mean(readiness_scores), 1)
+                team_aggregates['min_readiness_score'] = round(np.min(readiness_scores), 1)
+                team_aggregates['max_readiness_score'] = round(np.max(readiness_scores), 1)
+
+            # Count unique players who submitted readiness
+            unique_players_readiness = len(set(r.client_id for r in context['readiness_data']))
+            team_aggregates['readiness_reporting_players'] = unique_players_readiness
+
+        # 2. Physical Test Aggregates (Example: CMJ)
+        # This requires parsing string values to numeric, which can be error-prone.
+        # Let's try for CMJ if present.
+        cmj_values = []
+        for test_entry in context.get('physical_test_data', []):
+            if test_entry.test_type == TestTypeEnum.CMJ:
+                try:
+                    # Attempt to convert value to float (assuming it's stored as 'value' string)
+                    # This parsing logic should ideally be robust or values stored numerically
+                    val = float(test_entry.value)
+                    cmj_values.append(val)
+                except (ValueError, TypeError):
+                    pass # Ignore if not convertible
+
+        if cmj_values:
+            team_aggregates['avg_cmj'] = round(np.mean(cmj_values), 2)
+            team_aggregates['max_cmj'] = round(np.max(cmj_values), 2)
+
+        # 3. Body Composition Aggregates (Example: Weight)
+        if context['body_comp_data']:
+            weights = [bc.weight for bc in context['body_comp_data'] if bc.weight is not None]
+            if weights:
+                team_aggregates['avg_weight'] = round(np.mean(weights), 1)
+
+            body_fats = [bc.body_fat for bc in context['body_comp_data'] if bc.body_fat is not None]
+            if body_fats:
+                team_aggregates['avg_body_fat'] = round(np.mean(body_fats), 1)
+
+        context['team_aggregates'] = team_aggregates
+        # TODO: Generate team-level plots if desired (e.g., box plots of readiness, test distributions)
 
     return context 
